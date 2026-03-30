@@ -2,18 +2,16 @@ x-pg-environment: &pg-variables
   POSTGRES_USER: ${POSTGRES_USER:-payment_user}
   POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-payment_password}
   POSTGRES_DB: ${POSTGRES_DB:-payment_db}
+  POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
+  POSTGRES_PORT: ${POSTGRES_PORT:-5432}
 
 x-app-environment: &app-environment
   API_KEY: ${API_KEY:-secret-api-key}
-  POSTGRES_USER: ${POSTGRES_USER:-payment_user}
-  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-payment_password}
-  POSTGRES_DB: ${POSTGRES_DB:-payment_db}
-  POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
-  POSTGRES_PORT: ${POSTGRES_PORT:-5432}
   RABBITMQ_USER: ${RABBITMQ_USER:-guest}
   RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
   RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
   RABBITMQ_PORT: ${RABBITMQ_AMQP_PORT:-5672}
+  <<: *pg-variables
 
 services:
   postgres:
