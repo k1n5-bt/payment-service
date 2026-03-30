@@ -1,0 +1,87 @@
+x-pg-environment: &pg-variables
+  POSTGRES_USER: ${POSTGRES_USER:-payment_user}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-payment_password}
+  POSTGRES_DB: ${POSTGRES_DB:-payment_db}
+
+x-app-environment: &app-environment
+  API_KEY: ${API_KEY:-secret-api-key}
+  POSTGRES_USER: ${POSTGRES_USER:-payment_user}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-payment_password}
+  POSTGRES_DB: ${POSTGRES_DB:-payment_db}
+  POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
+  POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+  RABBITMQ_USER: ${RABBITMQ_USER:-guest}
+  RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
+  RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
+  RABBITMQ_PORT: ${RABBITMQ_AMQP_PORT:-5672}
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment: *pg-variables
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    networks:
+      - payment-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-payment_user} -d ${POSTGRES_DB:-payment_db}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
+    ports:
+      - "${RABBITMQ_AMQP_PORT:-5672}:5672"
+      - "${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    networks:
+      - payment-net
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: .
+    restart: unless-stopped
+    environment: *app-environment
+    ports:
+      - "${API_PORT:-8000}:8080"
+    networks:
+      - payment-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  consumer:
+    build: .
+    restart: unless-stopped
+    command: python -m payment_service.consumer
+    environment: *app-environment
+    networks:
+      - payment-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+volumes:
+  pg-data:
+  rabbitmq-data:
+
+networks:
+  payment-net:
+    driver: bridge
